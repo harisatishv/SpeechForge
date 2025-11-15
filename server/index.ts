@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { spawn } from "child_process";
+import { setupAuth } from "./auth";
 
 const app = express();
 
@@ -64,6 +65,8 @@ app.use((req, res, next) => {
   // Wait a moment for Python to start
   await new Promise(resolve => setTimeout(resolve, 2000));
   log("Python backend started");
+
+  setupAuth(app);
 
   // Register proxy routes BEFORE body parsing middleware
   // This allows the proxy to handle raw request bodies

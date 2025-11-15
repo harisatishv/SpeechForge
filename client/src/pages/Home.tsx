@@ -1,335 +1,181 @@
-import { useState, useEffect } from "react";
+import { Link } from "wouter";
+import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import TextInputPanel from "@/components/TextInputPanel";
-import VoiceSelector, { Voice } from "@/components/VoiceSelector";
-import VoiceCloneUpload from "@/components/VoiceCloneUpload";
-import RecordingControls from "@/components/RecordingControls";
-import AudioSettings from "@/components/AudioSettings";
-import AudioPlayer from "@/components/AudioPlayer";
-import VoiceCard from "@/components/VoiceCard";
-import ThemeToggle from "@/components/ThemeToggle";
-import TextTranslator from "@/components/TextTranslator";
-import { Sparkles, AlertCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Mic, Languages, ShieldCheck, Sparkles } from "lucide-react";
 
-const API_BASE_URL = "/api";
+const featureHighlights = [
+  {
+    title: "Expressive AI narration",
+    description: "Ultra-realistic voices capture every pause, breath, and emotion for storytelling that feels human.",
+    Icon: Mic,
+  },
+  {
+    title: "Instant multilingual reach",
+    description: "Translate and synthesize into 30+ languages with the built-in translator and multilingual models.",
+    Icon: Languages,
+  },
+  {
+    title: "Studio-grade security",
+    description: "Role-based access, encrypted storage, and human-in-the-loop safeguards keep your data protected.",
+    Icon: ShieldCheck,
+  },
+];
 
-interface ClonedVoice {
-  id: string;
-  name: string;
-  createdAt: string;
-}
+const pricingRows = [
+  {
+    plan: "Creator Free",
+    price: "$0",
+    characters: "10k characters / month",
+    voiceAccess: "Preset voices + translator",
+    support: "Community forum",
+    cta: "Get started",
+    href: "/auth/register",
+  },
+  {
+    plan: "Pro Studio",
+    price: "$5",
+    characters: "100k characters / month",
+    voiceAccess: "Custom neural voices & priority routing",
+    support: "Priority email & chat",
+    cta: "Upgrade now",
+    href: "/auth/register",
+  },
+];
 
 export default function Home() {
-  const { toast } = useToast();
-  const [text, setText] = useState("");
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
-  const [speed, setSpeed] = useState(1.0);
-  const [pitch, setPitch] = useState(0);
-  const [style, setStyle] = useState("default");
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-
-  // Fetch preset voices
-  const { data: voicesData, isLoading: isLoadingVoices, error: voicesError } = useQuery<{ voices: Voice[] }>({
-    queryKey: ["/api/voices"],
-  });
-
-  // Fetch cloned voices
-  const { data: clonedVoicesData, isLoading: isLoadingCloned } = useQuery<{ voices: ClonedVoice[] }>({
-    queryKey: ["/api/voices/cloned"],
-  });
-
-  // Use only real voices from ElevenLabs API
-  const voices = voicesData?.voices || [];
-  const clonedVoices = clonedVoicesData?.voices || [];
-
-  // Set first voice as selected when voices load
-  useEffect(() => {
-    if (voices.length > 0 && !selectedVoiceId) {
-      setSelectedVoiceId(voices[0].id);
-    }
-  }, [voices, selectedVoiceId]);
-
-  // TTS generation mutation
-  const generateTTSMutation = useMutation({
-    mutationFn: async (data: { text: string; voice_id: string; speed: number; pitch: number; style: string }) => {
-      const response = await fetch(`${API_BASE_URL}/tts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to generate audio");
-      }
-
-      // Convert response to blob and create URL
-      const blob = await response.blob();
-      return URL.createObjectURL(blob);
-    },
-    onSuccess: (url) => {
-      setAudioUrl(url);
-      toast({
-        title: "Audio generated",
-        description: "Your speech is ready to play",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Generation failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Voice clone mutation
-  const cloneVoiceMutation = useMutation({
-    mutationFn: async (data: { file: File; name: string }) => {
-      const formData = new FormData();
-      formData.append("audio_file", data.file);
-      formData.append("name", data.name);
-
-      const response = await apiRequest("POST", `${API_BASE_URL}/voices/clone`, formData);
-      return await response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/voices/cloned"] });
-      toast({
-        title: "Voice cloned successfully",
-        description: "Your voice is ready to use",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Cloning failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Delete cloned voice mutation
-  const deleteVoiceMutation = useMutation({
-    mutationFn: async (voiceId: string) => {
-      const response = await apiRequest("DELETE", `${API_BASE_URL}/voices/cloned/${voiceId}`);
-      return await response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/voices/cloned"] });
-      toast({
-        title: "Voice deleted",
-        description: "Cloned voice has been removed",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Deletion failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleTextFileUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setText(content);
-      toast({
-        title: "File uploaded",
-        description: `${file.name} loaded successfully`,
-      });
-    };
-    reader.readAsText(file);
-  };
-
-  const handleVoiceClone = async (file: File, name: string) => {
-    cloneVoiceMutation.mutate({ file, name });
-  };
-
-  const handleRecordingComplete = async (audioBlob: Blob) => {
-    // Convert blob to file
-    const file = new File([audioBlob], "recording.webm", { type: audioBlob.type });
-    const name = `Recording ${new Date().toLocaleTimeString()}`;
-    cloneVoiceMutation.mutate({ file, name });
-  };
-
-  const handleDeleteClonedVoice = (id: string) => {
-    deleteVoiceMutation.mutate(id);
-  };
-
-  const handleGenerate = async () => {
-    if (!text.trim()) {
-      toast({
-        title: "No text provided",
-        description: "Please enter some text to convert to speech",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!selectedVoiceId) {
-      toast({
-        title: "No voice selected",
-        description: "Please select a voice",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    generateTTSMutation.mutate({
-      text,
-      voice_id: selectedVoiceId,
-      speed,
-      pitch,
-      style,
-    });
-  };
-
-  const handleDownload = () => {
-    if (audioUrl) {
-      const link = document.createElement("a");
-      link.href = audioUrl;
-      link.download = "generated-speech.mp3";
-      link.click();
-      toast({
-        title: "Download started",
-        description: "Your audio file is downloading",
-      });
-    }
-  };
-
-  const showApiKeyWarning = voicesError && ((voicesError as any).message?.includes("503") || (voicesError as any).message?.includes("401"));
-
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-semibold">VoiceForge</h1>
+      <AppHeader variant="marketing" />
+      <main className="max-w-7xl mx-auto px-6 py-12 space-y-16">
+        <section id="hero" className="grid grid-cols-1 gap-10 lg:grid-cols-2 items-center">
+          <div className="space-y-6">
+            <p className="text-sm font-semibold tracking-wide uppercase text-primary">New • AI voice platform</p>
+            <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight">
+              Text-to-speech that sounds like your most trusted storyteller.
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              SpeechForge blends neural rendering, translator-assisted prompts, and curated AI voices so product teams
+              can launch lifelike narration, IVR agents, and localized media in minutes instead of weeks.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button size="lg" asChild>
+                <Link href="/auth/register">Create account</Link>
+              </Button>
+              <Button variant="outline" size="lg" asChild>
+                <Link href="/studio">Open studio</Link>
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">Studio access is available once you sign in or create an account.</p>
           </div>
-          <ThemeToggle />
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {showApiKeyWarning && (
-          <Alert className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              {(voicesError as any).message?.includes("401") 
-                ? "Your ElevenLabs API key is missing required permissions. Please enable 'voices_read' and 'tts' permissions in your ElevenLabs account settings. Demo voices are available for testing the interface."
-                : "ElevenLabs API key not configured. Demo voices are available for testing the interface. Add your API key to enable actual voice generation and access the full voice library."}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="mb-6">
-          <TextTranslator onTranslate={(translatedText) => setText(translatedText)} />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-6">
-            <TextInputPanel
-              value={text}
-              onChange={setText}
-              onFileUpload={handleTextFileUpload}
-            />
-          </Card>
-
-          <div className="flex flex-col gap-6">
-            <Card className="p-6">
-              <h2 className="text-lg font-medium mb-4">Voice Settings</h2>
-              <div className="flex flex-col gap-6">
-                {isLoadingVoices ? (
-                  <div className="text-sm text-muted-foreground">Loading voices...</div>
-                ) : (
-                  <VoiceSelector
-                    voices={voices}
-                    selectedVoiceId={selectedVoiceId}
-                    onSelectVoice={setSelectedVoiceId}
-                  />
-                )}
-
-                <Separator />
-
-                <Tabs defaultValue="upload" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="upload" data-testid="tab-upload">Upload</TabsTrigger>
-                    <TabsTrigger value="record" data-testid="tab-record">Record</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="upload" className="mt-4">
-                    <div className="flex flex-col gap-2">
-                      <h3 className="text-sm font-medium">Clone Voice from Audio</h3>
-                      <VoiceCloneUpload onFileSelect={handleVoiceClone} />
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="record" className="mt-4">
-                    <div className="flex flex-col gap-2">
-                      <h3 className="text-sm font-medium">Clone Voice from Microphone</h3>
-                      <RecordingControls onRecordingComplete={handleRecordingComplete} />
-                    </div>
-                  </TabsContent>
-                </Tabs>
-
-                <Separator />
-
-                <AudioSettings
-                  speed={speed}
-                  onSpeedChange={setSpeed}
-                  pitch={pitch}
-                  onPitchChange={setPitch}
-                  style={style}
-                  onStyleChange={setStyle}
-                />
+          <Card className="p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-primary" />
               </div>
-            </Card>
+              <div>
+                <p className="text-sm text-muted-foreground">Ship faster</p>
+                <p className="text-lg font-medium">From idea to dialogue in 60 seconds.</p>
+              </div>
+            </div>
+            <Separator />
+            <ul className="space-y-3 text-sm text-muted-foreground">
+              <li>• Upload a script or paste live customer chat.</li>
+              <li>• Select a multilingual neural voice that fits your brand.</li>
+              <li>• Export clean MP3 or stream via WebSocket.</li>
+            </ul>
+          </Card>
+        </section>
 
-            <Button
-              onClick={handleGenerate}
-              size="lg"
-              disabled={generateTTSMutation.isPending || isLoadingVoices}
-              data-testid="button-generate"
-            >
-              {generateTTSMutation.isPending ? "Generating..." : "Generate Speech"}
-            </Button>
+        <section id="features" className="space-y-6">
+          <div className="max-w-2xl">
+            <p className="text-sm font-semibold text-primary uppercase tracking-wide">Why SpeechForge</p>
+            <h2 className="text-3xl font-semibold tracking-tight">Built for content teams and AI agents.</h2>
+            <p className="text-muted-foreground mt-2">
+              Tap into realistic prosody while keeping every workflow secure, collaborative, and measurable.
+            </p>
           </div>
-        </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {featureHighlights.map(({ title, description, Icon }) => (
+              <Card key={title} className="p-5 space-y-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Icon className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">{title}</p>
+                  <p className="text-sm text-muted-foreground">{description}</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
 
-        {clonedVoices.length > 0 && (
-          <Card className="p-6 mt-6">
-            <h2 className="text-lg font-medium mb-4">Cloned Voices</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {clonedVoices.map((voice) => (
-                <VoiceCard
-                  key={voice.id}
-                  id={voice.id}
-                  name={voice.name}
-                  createdAt={voice.createdAt}
-                  onDelete={handleDeleteClonedVoice}
-                  onSelect={setSelectedVoiceId}
-                  isSelected={selectedVoiceId === voice.id}
-                />
-              ))}
+        <section id="pricing" className="space-y-6">
+          <div className="max-w-2xl">
+            <p className="text-sm font-semibold text-primary uppercase tracking-wide">Pricing</p>
+            <h2 className="text-3xl font-semibold tracking-tight">Simple tiers for every team.</h2>
+            <p className="text-muted-foreground mt-2">
+              Start free, then unlock studio automation, premium voices, and priority support for just $5 per month.
+            </p>
+          </div>
+          <Card className="overflow-hidden">
+            <div className="px-6 py-6 border-b">
+              <p className="text-sm text-muted-foreground">Compare plans</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-border text-sm">
+                <thead className="bg-muted/40 text-left">
+                  <tr>
+                    <th className="px-6 py-3 font-medium text-foreground">Plan</th>
+                    <th className="px-6 py-3 font-medium text-foreground">Monthly price</th>
+                    <th className="px-6 py-3 font-medium text-foreground">Included characters</th>
+                    <th className="px-6 py-3 font-medium text-foreground">Voice access</th>
+                    <th className="px-6 py-3 font-medium text-foreground">Support</th>
+                    <th className="px-6 py-3 font-medium text-foreground"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {pricingRows.map((row) => (
+                    <tr key={row.plan} className={row.plan === "Pro Studio" ? "bg-primary/5" : undefined}>
+                      <td className="px-6 py-4 font-medium">{row.plan}</td>
+                      <td className="px-6 py-4">{row.price}</td>
+                      <td className="px-6 py-4">{row.characters}</td>
+                      <td className="px-6 py-4">{row.voiceAccess}</td>
+                      <td className="px-6 py-4">{row.support}</td>
+                      <td className="px-6 py-4 text-right">
+                        <Button variant={row.plan === "Pro Studio" ? "default" : "outline"} size="sm" asChild>
+                          <Link href={row.href}>{row.cta}</Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </Card>
-        )}
+        </section>
 
-        <Card className="p-6 mt-6">
-          <h2 className="text-lg font-medium mb-4">Generated Audio</h2>
-          <AudioPlayer audioUrl={audioUrl} onDownload={handleDownload} />
-        </Card>
+        <section className="border rounded-xl px-8 py-10 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-primary uppercase tracking-wide">Get early access</p>
+              <h3 className="text-2xl font-semibold mt-1">Ready to create lifelike speech?</h3>
+              <p className="text-muted-foreground mt-2 max-w-2xl">
+                Sign in with Google or create an account with basic info. You&apos;ll unlock the speech studio, premium
+                AI voices, and team controls instantly.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button size="lg" asChild>
+                <Link href="/auth/login">Sign in</Link>
+              </Button>
+              <Button variant="outline" size="lg" asChild>
+                <Link href="/auth/register">Create account</Link>
+              </Button>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   );
