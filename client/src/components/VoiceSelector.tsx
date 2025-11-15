@@ -142,7 +142,7 @@ export default function VoiceSelector({ voices, selectedVoiceId, onSelectVoice }
             <CommandList>
               <CommandEmpty>No voice found.</CommandEmpty>
               <CommandGroup>
-                {voices.map((voice) => (
+                {voices.filter(v => v.preview_url).map((voice) => (
                   <CommandItem
                     key={voice.id}
                     value={`${voice.name} ${voice.language} ${voice.accent}`}
@@ -165,23 +165,21 @@ export default function VoiceSelector({ voices, selectedVoiceId, onSelectVoice }
                         ({voice.language} • {voice.accent})
                       </span>
                     </div>
-                    {voice.preview_url && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6 shrink-0"
-                        onClick={(e) => handlePlayPreview(voice, e)}
-                        data-testid={`button-preview-${voice.id}`}
-                      >
-                        {loadingVoiceId === voice.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : playingVoiceId === voice.id ? (
-                          <Pause className="h-3 w-3" />
-                        ) : (
-                          <Play className="h-3 w-3" />
-                        )}
-                      </Button>
-                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 shrink-0"
+                      onClick={(e) => handlePlayPreview(voice, e)}
+                      data-testid={`button-preview-${voice.id}`}
+                    >
+                      {loadingVoiceId === voice.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : playingVoiceId === voice.id ? (
+                        <Pause className="h-3 w-3" />
+                      ) : (
+                        <Play className="h-3 w-3" />
+                      )}
+                    </Button>
                   </CommandItem>
                 ))}
               </CommandGroup>

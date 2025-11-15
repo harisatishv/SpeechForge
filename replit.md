@@ -1,16 +1,13 @@
-# VoiceForge - Text-to-Speech & Voice Cloning Application
+# VoiceForge - Text-to-Speech Application
 
-A production-ready web application for converting text to natural-sounding speech with AI voice cloning capabilities.
+A production-ready web application for converting text to natural-sounding speech with premium AI voices.
 
 ## Overview
 
 VoiceForge enables users to:
 - Convert text to speech with multiple language/accent options
-- Clone voices from uploaded audio samples (15+ seconds recommended)
-- Clone voices from microphone recordings
 - Customize speech parameters (speed, pitch, speaking style)
 - Preview and download generated audio files
-- Manage cloned voices
 
 ## Tech Stack
 
@@ -27,7 +24,6 @@ VoiceForge enables users to:
   - Google Cloud Text-to-Speech for English ($4/1M characters)
   - ElevenLabs v3 Model for Indian languages (70+ languages)
   - Automatic language detection and routing
-- Voice cloning via ElevenLabs API
 - Uvicorn ASGI server
 
 ## Project Structure
@@ -51,7 +47,7 @@ VoiceForge enables users to:
 ### API Keys
 
 Required:
-1. **ElevenLabs API Key** (required for Indian languages and voice cloning)
+1. **ElevenLabs API Key** (required for Indian languages)
    - Get from: https://elevenlabs.io/app/settings/api-keys
    - Copy `.env.example` to `.env`
    - Add as `ELEVENLABS_API_KEY` in `.env`
@@ -93,17 +89,6 @@ Generate text-to-speech audio with provider-based routing:
 - Body: `{ text, voice_id, speed, pitch, style }`
 - Returns: MP3 audio file
 
-### POST `/api/voices/clone`
-Clone a voice from uploaded audio
-- Form data: `name` (string), `audio_file` (file)
-- Returns: Cloned voice data
-
-### GET `/api/voices/cloned`
-Get list of cloned voices
-
-### DELETE `/api/voices/cloned/{voice_id}`
-Delete a cloned voice
-
 ## Features
 
 ### Text Input
@@ -127,14 +112,8 @@ Delete a cloned voice
   - ElevenLabs voices: Direct preview URLs from ElevenLabs API
   - Journey voices: No preview (require special model configuration)
   - Race condition prevention ensures only one preview plays at a time
-- Custom cloned voices
 - Voice metadata display with descriptive names (e.g., "Australian Female A (Standard)")
 - Only real voices from APIs (no fake demo voices)
-
-### Voice Cloning
-- Upload audio files (MP3, WAV)
-- Record from microphone
-- Requires 15+ seconds of clear audio
 
 ### Audio Settings
 - Speed control (0.5x - 2.0x)
@@ -153,11 +132,11 @@ Delete a cloned voice
 - All interactive elements include `data-testid` attributes for testing
 - Dark mode supported via theme toggle
 
-## Recent Changes
+# Recent Changes
 
 - 2025-11-08: Initial setup with Python backend and React frontend
 - Design follows Linear-inspired minimalist utility design
-- Integrated ElevenLabs API for voice synthesis and cloning
+- Integrated ElevenLabs API for voice synthesis
 - **Upgraded to ElevenLabs v3 Model** - supports 70+ languages (90% of world population)
 - Any voice can now speak in any of the 70+ supported languages
 - **Implemented hybrid TTS routing system:**

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
@@ -51,20 +51,12 @@ else:
     print("Warning: GOOGLE_CLOUD_CREDENTIALS not set. English TTS will use ElevenLabs.")
     google_tts_client = None
 
-# In-memory storage for cloned voices
-cloned_voices = {}
-
-
 class TTSRequest(BaseModel):
     text: str
     voice_id: str
     speed: float = 1.0
     pitch: int = 0
     style: str = "default"
-
-
-class VoiceCloneRequest(BaseModel):
-    name: str
 
 
 class TranslateRequest(BaseModel):
@@ -403,97 +395,6 @@ async def generate_tts(request: TTSRequest):
             )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating audio: {str(e)}")
-
-
-@app.post("/voices/clone")
-async def clone_voice(
-    name: str = Form(...),
-    audio_file: UploadFile = File(...)
-):
-    """Clone a voice from an uploaded audio file"""
-    if not elevenlabs_client:
-        raise HTTPException(status_code=503, detail="ElevenLabs API key not configured")
-    
-    if not name.strip():
-        raise HTTPException(status_code=400, detail="Voice name cannot be empty")
-    
-    # Read audio file
-    audio_data = await audio_file.read()
-    
-    try:
-        # Save audio file temporarily
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
-            temp_file.write(audio_data)
-            temp_file_path = temp_file.name
-        
-        try:
-            # Create voice using ElevenLabs IVC API
-            voice = elevenlabs_elevenlabs_client.voices.ivc.create(
-                name=name,
-                files=[temp_file_path]
-            )
-            
-            # Store in our cloned voices
-            voice_data = {
-                "id": voice.voice_id,
-                "name": name,
-                "createdAt": "Just now"
-            }
-            cloned_voices[voice.voice_id] = voice_data
-            
-            return voice_data
-        finally:
-            # Clean up temp file
-            os.unlink(temp_file_path)
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code == 401:
-            error_detail = e.response.json() if e.response.content else {}
-            error_str = str(error_detail)
-            
-            # Check for subscription limitation
-            if "can_not_use_instant_voice_cloning" in error_str or "no access to use instant voice cloning" in error_str:
-                raise HTTPException(
-                    status_code=402,
-                    detail="Voice cloning requires an ElevenLabs paid plan. Please upgrade your subscription at: https://elevenlabs.io/pricing"
-                )
-            # Check for missing API key permissions
-            elif "missing_permissions" in error_str or "voices_write" in error_str:
-                raise HTTPException(
-                    status_code=401,
-                    detail="API key missing 'voices_write' permission. Please enable voice cloning permission in your ElevenLabs API key settings at: https://elevenlabs.io/app/settings/api-keys"
-                )
-            raise HTTPException(status_code=401, detail="Invalid API key or insufficient permissions")
-        raise HTTPException(status_code=500, detail=f"Error cloning voice: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error cloning voice: {str(e)}")
-
-
-@app.get("/voices/cloned")
-async def get_cloned_voices():
-    """Get list of cloned voices"""
-    return {"voices": list(cloned_voices.values())}
-
-
-@app.delete("/voices/cloned/{voice_id}")
-async def delete_cloned_voice(voice_id: str):
-    """Delete a cloned voice"""
-    if not elevenlabs_client:
-        raise HTTPException(status_code=503, detail="ElevenLabs API key not configured")
-    
-    if voice_id not in cloned_voices:
-        raise HTTPException(status_code=404, detail="Voice not found")
-    
-    try:
-        # Delete from ElevenLabs
-        elevenlabs_client.voices.delete(voice_id)
-        
-        # Remove from our storage
-        del cloned_voices[voice_id]
-        
-        return {"message": "Voice deleted successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting voice: {str(e)}")
 
 
 @app.post("/translate")

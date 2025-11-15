@@ -156,8 +156,8 @@
 1. **Header** (h-16): Logo + optional settings
 2. **Main Workflow Area** (2-column on desktop):
    - **Left Panel:** Text input (textarea + file upload option)
-   - **Right Panel:** Settings & preview (voice selection, cloning, audio player)
+   - **Right Panel:** Settings & preview (voice selection, fine-tuning controls, audio player)
 3. **Results Section** (below or integrated): Audio player + download button
-4. **Voice Library** (collapsible section): Grid of saved cloned voices
+4. **Voice Library** (optional collapsible section): Grid of saved presets or favorite provider voices
 
 **Mobile:** Single column, progressive disclosure (accordion for advanced settings)
